@@ -1,0 +1,126 @@
+---
+title: "Milestone Report"
+author: "Catalina Barco Castillo"
+date: "4/30/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=TRUE}
+
+library(stringr)
+library(knitr)
+library(rmarkdown)
+library(NLP)
+library(tm)
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(rJava)
+library(RWeka)
+library(dplyr)
+library(RColorBrewer)
+library(wordcloud)
+library(wordcloud2)
+
+usblogs_file = 'final/en_US/en_US.blogs.txt'
+usnews_file = 'final/en_US/en_US.news.txt'
+ustwitter_file = 'final/en_US/en_US.twitter.txt'
+
+usblogs = readLines(usblogs_file)
+usnews = readLines(usnews_file)
+ustwitter = readLines(ustwitter_file)
+files = c(usblogs_file,usnews_file,ustwitter_file)
+mbsizes = sapply(files, function(x) {file.size(x)/1024^2})
+
+stats = sapply(list(usblogs,usnews,ustwitter),function(x){ c(length(x) , sum(str_count(x,'\\S+')) )})
+invisible(gc())
+stats = rbind(mbsizes,stats)
+stats = as.data.frame(stats)
+names(stats) = c('usblogs','usnews','ustwitter')
+row.names(stats) = c('filesize(MB)','lines','word_count')
+kable(stats,digits = 0)
+
+usblogs = usblogs[seq(1,length(usblogs), 500000)]
+usnews = usnews[seq(1,length(usnews), 500000)]
+ustwitter = ustwitter[seq(1,length(ustwitter), 500000)]
+invisible(gc())
+raw_text = c(usblogs,usnews,ustwitter)
+invisible(gc())
+
+raw_source = VectorSource(raw_text)
+invisible(gc())
+raw_corpus <- VCorpus(raw_source)
+invisible(gc())
+
+clean_corpus <- function(corpus){
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, stripWhitespace)
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus,content_transformer(function(x) gsub("[[:digit:]]","",x)))
+  corpus <- tm_map(corpus,content_transformer(function(x) gsub(" th", "",x)))
+  corpus <- tm_map(corpus,content_transformer(function(x) gsub("http[[:alnum:]]*","",x)))
+  corpus <- tm_map(corpus,content_transformer(function(x) iconv(x, "latin1", "ASCII", sub="")))
+  corpus <- tm_map(corpus,content_transformer(function(x) gsub("([[:alpha:]])\\1{2,}", "\\1\\1", x)))
+  gc()
+  return(corpus)}
+corpus <- clean_corpus(raw_corpus)
+save(corpus,file='corpus.RData')
+
+unigram <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
+tdm1<-TermDocumentMatrix(corpus,control = list(tokenize = unigram))
+invisible(gc())
+wordMatrix1 = as.data.frame((as.matrix(  tdm1 )) ) 
+invisible(gc())
+v1 <- sort(rowSums(wordMatrix1),decreasing=TRUE)
+d1 <- data.frame(word = names(v1),freq=v1)
+rm(tdm1,wordMatrix1)
+for(i in 1:100) gc()
+d1$prob = d1$freq/sum(d1$freq)
+save(unigram,file='unigram.RData')
+
+bigram <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+tdm2<-TermDocumentMatrix(corpus,control = list(tokenize = bigram))
+invisible(gc())
+wordMatrix2 = as.matrix(  tdm2 )
+wordMatrix2 = as.data.frame(wordMatrix2 ) 
+invisible(gc())
+v2 <- sort(rowSums(wordMatrix2),decreasing=TRUE)
+d2 <- data.frame(word = names(v2),freq=v2)
+rm(tdm2,wordMatrix2)
+for(i in 1:100) gc()
+# word probablity
+d2$prob = d2$freq/sum(d2$freq)
+save(bigram,file='bigram.RData')
+
+trigram <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+tdm3<-TermDocumentMatrix(corpus,control = list(tokenize = trigram))
+invisible(gc())
+wordMatrix3 = as.matrix(  tdm3 )
+invisible(gc())
+v3 <- sort(rowSums(wordMatrix3),decreasing=TRUE)
+d3 <- data.frame(word = names(v3),freq=v3)
+rm(tdm3,wordMatrix3)
+for(i in 1:100) gc()
+d3$prob = d3$freq/sum(d3$freq)
+save(trigram,file='trigram.RData')
+
+quadgram <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
+tdm4<-TermDocumentMatrix(corpus,control = list(tokenize = quadgram))
+invisible(gc())
+wordMatrix4 = as.matrix(  tdm4 )
+invisible(gc())
+v4 <- sort(rowSums(wordMatrix4),decreasing=TRUE)
+d4 <- data.frame(word = names(v4),freq=v4)
+rm(tdm4,wordMatrix4)
+for(i in 1:100) gc()
+d4$prob = d4$freq/sum(d4$freq)
+save(quadgram,file='quadgram.RData')
+```
+
+```{r echo=TRUE}
+wordcloud(corpus, min.freq = 1, max.words=200, random.order=FALSE, rot.per=.15, colors=colorRampPalette(brewer.pal(8,"Dark2"))(32), scale=c(3, .3))
+```
